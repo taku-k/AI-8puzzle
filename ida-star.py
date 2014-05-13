@@ -2,12 +2,43 @@
 
 import pydot
 
+# 各状態での展開番号をリストで保持しておく
+state = {}
+
 class Node():
 # self.pos list structure
 	def __init__(self, pos = "", parent = None, depth = 0):
 		self.pos = map(int, list(pos))
 		self.parent = parent
 		self.depth = depth
+
+# number of mismatched tiles
+	def h1(self):
+		ret = 0
+		goal = [1,2,3,4,5,6,7,8,9]
+		for i in range(9):
+			if self.pos[i] != goal[i]:
+				ret += 1
+		if self.pos[8] != 9:
+			ret -= 1
+		return ret
+
+# manhattan distance
+	def h2(self):
+		ret = 0
+		md = ((0,0),(1,0),(2,0),(0,1),(1,1),(2,1),(0,2),(1,2),(2,2))
+		for i in range(9):
+			if self.pos[i] != 9:
+				ret = ret + abs(md[i][0] - md[self.pos[i]-1][0]) + abs(md[i][1] - md[self.pos[i]-1][1])
+		return ret
+
+
+	def g(self):
+		return self.depth
+
+	def f(self):
+		return self.h1() + self.g()
+		#return self.h2() + self.g()
 
 # 9のindexを返す
 	def __nine_index__(self):
@@ -78,39 +109,10 @@ class Node():
 			ret += str(i)
 		return ret
 
-# number of mismatched tiles
-	def h1(self):
-		ret = 0
-		goal = [1,2,3,4,5,6,7,8,9]
-		for i in range(9):
-			if self.pos[i] != goal[i]:
-				ret += 1
-		if self.pos[8] != 9:
-			ret -= 1
-		return ret
-
-# manhattan distance
-	def h2(self):
-		ret = 0
-		md = ((0,0),(1,0),(2,0),(0,1),(1,1),(2,1),(0,2),(1,2),(2,2))
-		for i in range(9):
-			if self.pos[i] != 9:
-				ret = ret + abs(md[i][0] - md[self.pos[i]-1][0]) + abs(md[i][1] - md[self.pos[i]-1][1])
-		return ret
-
-
-	def g(self):
-		return self.depth
-
-	def f(self):
-		return self.h1() + self.g()
-		#return self.h2() + self.g()
 
 # 図に表示する用に成形する
 	def print_node(self, count = 0):
-		if count != 0:
-			self.count = count
-		ret = '(' + str(self.f()) + ') (' + str(self.count) + ')\n'
+		ret = '(' + str(self.f()) + ') (' + str(state[self.to_String(self.pos)]) + ')\n'
 		for i in range(9):
 			if self.pos[i] == 9:
 				ret += ' '
@@ -144,74 +146,79 @@ class Node():
 		return ret
 
 
-
-if __name__ == '__main__':
-	start = Node(pos = "139428765")
-	g = pydot.Dot('A-Star', graph_type='digraph')
-	g.set_rankdir('UD')
+def ida(g):
+	start = Node(pos = "129743586")
 
 	count = 1
-	opend = [[start, start.to_String(start.pos)]]
-	closed = []
+	cutoff = 0
 
-	while len(opend) != 0:
-		# sort
-		opend.sort(cmp = lambda x, y: cmp(x[0].f(), y[0].f()))
-		expand = opend.pop(0)
-		expand_node = expand[0]
-		expand_state = expand[1]
-		closed.append([expand_node, expand_node.to_String(expand_node.pos)])
+	while 1:
+		cutoff += 1
+		opend = [[start, start.to_String(start.pos)]]
+		closed = []
 
-		# startノードなら特別な処理
-		if expand_node == start:
-			node = pydot.Node(start.print_node(count))
-			g.add_node(node)
-			count += 1
+		while len(opend) != 0:
+			# sort
+			# opend.sort(cmp = lambda x, y: cmp(x[0].f(), y[0].f()))
+			expand = opend.pop()
+			expand_node = expand[0]
+			expand_state = expand[1]
+			closed.append([expand_node, expand_node.to_String(expand_node.pos)])
 
-		# goal
-		if expand_node.to_String(expand_node.pos) == "123456789":
-			break
-
-		# other
-		succ = expand_node.expand()
-		for i in succ:
-			# not opned and not closed
-			if i.to_String(i.pos) not in [j[1] for j in opend] and i.to_String(i.pos) not in [j[1] for j in closed]:
-				opend.append([i, i.to_String(i.pos)])
-				g.add_edge(pydot.Edge(expand_node.print_node(), i.print_node(count)))
+			# startノードなら特別な処理
+			if expand_node == start:
+				state.setdefault(start.to_String(start.pos), []).append(count)
+				node = pydot.Node(start.print_node(count))
+				g.add_node(node)
 				count += 1
 
-			# opend
-			if i.to_String(i.pos) in [j[1] for j in opend]:
-				index = 0
-				for j in range(len(opend)):
-					if i.to_String(i.pos) == opend[j][1]:
-						index = j
-						break
-				if opend[index][0].f() > i.f():
-					opend.pop(index)
+			# goal
+			if expand_node.to_String(expand_node.pos) == "123456789":
+				return 1
+
+			# other
+			succ = expand_node.expand()
+			for i in succ:
+				# not opned and not closed
+				if i.to_String(i.pos) not in [j[1] for j in opend] and i.to_String(i.pos) not in [j[1] for j in closed] and i.f() <= cutoff:
 					opend.append([i, i.to_String(i.pos)])
+					state.setdefault(i.to_String(i.pos), []).append(count)
 					g.add_edge(pydot.Edge(expand_node.print_node(), i.print_node(count)))
 					count += 1
 
-			# closed
-			if i.to_String(i.pos) in [j[1] for j in closed]:
-				index = 0
-				# closeにある配置のindexを取得する
-				for j in range(len(closed)):
-					if i.to_String(i.pos) == closed[j][1]:
-						index = j
-						break
-				# そのindexのf()とこのiのf()を比較して小さければopenにいれる
-				if closed[index][0].f() > i.f():
-					closed.pop(index)
-					opend.append([i, i.to_String(i.pos)])
-					g.add_edge(pydot.Edge(expand_node.print_node(), i.print_node(count)))
-					count += 1
+				# opend
+				if i.to_String(i.pos) in [j[1] for j in opend] and i.f() <= cutoff:
+					index = 0
+					for j in range(len(opend)):
+						if i.to_String(i.pos) == opend[j][1]:
+							index = j
+							break
+					if opend[index][0].f() > i.f():
+						opend.pop(index)
+						opend.append([i, i.to_String(i.pos)])
+						state.setdefault(i.to_String(i.pos), []).append(count)
+						g.add_edge(pydot.Edge(expand_node.print_node(), i.print_node(count)))
+						count += 1
 
+				# closed
+				if i.to_String(i.pos) in [j[1] for j in closed] and i.f() <= cutoff:
+					index = 0
+					# closeにある配置のindexを取得する
+					for j in range(len(closed)):
+						if i.to_String(i.pos) == closed[j][1]:
+							index = j
+							break
+					# そのindexのf()とこのiのf()を比較して小さければopenにいれる
+					if closed[index][0].f() > i.f():
+						closed.pop(index)
+						opend.append([i, i.to_String(i.pos)])
+						state.setdefault(i.to_String(i.pos), []).append(count)
+						g.add_edge(pydot.Edge(expand_node.print_node(), i.print_node(count)))
+						count += 1
+
+
+if __name__ == '__main__':
+	g = pydot.Dot('A-Star', graph_type='digraph')
+	g.set_rankdir('UD')
+	ida(g)
 	print(g.to_string())
-
-
-
-
-

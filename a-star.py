@@ -146,7 +146,7 @@ class Node():
 
 
 if __name__ == '__main__':
-	start = Node(pos = "139428765")
+	start = Node(pos = "129743586")
 	g = pydot.Dot('A-Star', graph_type='digraph')
 	g.set_rankdir('UD')
 
@@ -210,8 +210,3 @@ if __name__ == '__main__':
 					count += 1
 
 	print(g.to_string())
-
-
-
-
-
